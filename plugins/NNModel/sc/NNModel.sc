@@ -5,7 +5,6 @@
 NNModel {
 
 	var <server, <path, <idx, <info, <methods;
-	var <isLoaded=false;
 
 	*new { ^nil }
 
@@ -24,10 +23,6 @@ NNModel {
 		^this.methods.detect { |m| m.name == name };
 	}
 
-	doOnServerBoot {
-		server.sendMsg(*this.loadMsg)
-	}
-
 	*load { |path, id(-1), server(Server.default), action|
 		var loadMsg, infoFile, model;
 		path = path.standardizePath;
@@ -38,11 +33,7 @@ NNModel {
 			Error("model file '%' not found".format(path)).throw
 		};
 
-		if (infoFile.isNil) {
-			var infoID = UniqueID.next; 
-			infoFile = PathName.tmp +/+ "nn-sc-" ++ infoID ++ ".yaml"
-		};
-
+		infoFile = infoFile ?? {PathName.tmp +/+ "nn-sc-" ++ UniqueID.next ++ ".yaml"};
 		loadMsg = NN.loadMsg(id, path, infoFile);
 
 		model = super.newCopyArgs(server);
@@ -52,7 +43,6 @@ NNModel {
 			// server writes info file: read it
 			protect { 
 				model.initFromFile(infoFile);
-				ServerBoot.add(model, server);
 				action.(model)
 			} {
 				File.delete(infoFile);
@@ -62,9 +52,13 @@ NNModel {
 		^model;
 	}
 
-	*read { |infoFile, server(Server.default)|
-		^super.newCopyArgs(server).initFromFile(infoFile);
+	reload { |action|
+		var key = this.key;
+		// delete key first, otherwise NN.load is no-op
+		NN.prDeleteModel(key);
+		NN.load(key, path, idx, server, action);
 	}
+
 	*fromInfo { |info, overrideId, server(Server.default)|
 		^super.newCopyArgs(server).initFromInfo(info, overrideId);
 	}
@@ -79,7 +73,7 @@ NNModel {
 		info = infoObj;
 		path = info.path;
 		idx = overrideId ? info.idx;
-		methods = info.methods.collect { |m| m.copyForModel(this) }
+		methods = info.methods.collect { |m| m.copyForModel(this) };
 	}
 
 	loadMsg { |newPath, infoFile|

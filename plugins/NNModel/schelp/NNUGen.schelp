@@ -36,10 +36,9 @@ code::
 (
 s.options.memSize = 2**11;
 s.reboot.waitForBoot {
-	NNModel.load(\rave, "~/rave/model.ts")
-	.describe;
-	NNModel.load(\prior, "~/msprior/prior_model.ts")
-	.describe;
+	NN.load(\rave, "~/rave/model.ts");
+	NN.load(\prior, "~/msprior/prior_model.ts");
+	NN.describeAll;
 };
 )
 

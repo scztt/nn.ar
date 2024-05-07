@@ -3,20 +3,19 @@ NN {
 	*initClass {
 		rtModelStore = IdentityDictionary[];
 		// store model info by path
-		rtModelsInfo = IdentityDictionary[]
+		rtModelsInfo = IdentityDictionary[];
 	}
 
-	*models {
-		^if(this.isNRT, this.nrtModelStore, rtModelStore).values;
+	// NN keeps track of all loaded models
+	*prModelStore {
+		^if(this.isNRT, this.nrtModelStore, rtModelStore);
 	}
-	*model { |key|
-		^if(this.isNRT, this.nrtModelStore, rtModelStore)[key];
-	}
+	*models { ^this.prModelStore.values }
+	*model { |key| ^this.prModelStore[key] }
+	*prPutModel { |key, model| this.prModelStore[key] = model }
+	*prDeleteModel { |key| this.prModelStore.removeAt(key) }
 	*keyForModel { |model|
-		^if(this.isNRT, this.nrtModelStore, rtModelStore).findKeyForValue(model);
-	}
-	*prPut { |key, model|
-		if(this.isNRT, this.nrtModelStore, rtModelStore)[key] = model;
+		^this.prModelStore.findKeyForValue(model);
 	}
 
 	*prCacheInfo { |info|
@@ -46,18 +45,18 @@ NN {
 	*load { |key, path, id(-1), server(Server.default), action|
 		var model = this.model(key);
 		if (path.isKindOf(String).not) {
-			Error("NN.load: path needs to be a string, got: %").format(path).throw
+			Error("NN.load: path needs to be a string, got: %".format(path)).throw
 		};
-		if (model.isNil or: {model.isLoaded.not}) {
+		if (model.isNil) {
 			if (this.isNRT) {
 				var info =  this.prGetCachedInfo(path) ?? {
 					Error("NN.load (nrt): model info not found for %".format(path)).throw;
 				};
 				model = NNModel.fromInfo(info, this.nextModelID);
-				this.prPut(key, model);
+				this.prPutModel(key, model);
 			} {
 				model = NNModel.load(path, id, server, action: { |m|
-				this.prPut(key, m);
+				this.prPutModel(key, m);
 					// call action after adding to registry: in case action needs key
 					action.value(m);
 				});
@@ -78,7 +77,9 @@ NN {
 	}
 
 	*loadMsg { |id, path, infoFile|
-		^["/cmd", "/nn_load", id, path.standardizePath, infoFile.standardizePath]
+		path = path !? { path.standardizePath };
+		infoFile = infoFile !? { infoFile.standardizePath };
+		^["/cmd", "/nn_load", id, path, infoFile]
 	}
 	*dumpInfoMsg { |modelIdx, outFile|
 		^["/cmd", "/nn_query", modelIdx ? -1, outFile ? ""]

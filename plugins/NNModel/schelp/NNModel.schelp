@@ -69,6 +69,13 @@ argument:: name
 method::attributes
 A list of all available model attribute names.
 
+method::reload
+Forces reloading this model on the server
+code::
+// reload all models
+NN.models.do { |model| model.reload }
+::
+
 method::idx
 Numeric index used on the server to identify this model.
 
