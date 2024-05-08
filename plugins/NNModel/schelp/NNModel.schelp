@@ -10,7 +10,8 @@ On sclang, NNModel provides convenience methods to initiate model loading on the
 server, and to gather model descriptions (e.g. available methods and settable
 attributes).
 
-It is used internally by the UGen link::Classes/NN::.
+It is used internally by the UGen link::Classes/NN::, and in most cases it
+shouldn't be necessary for the user to create one manually.
 
 classmethods::
 
@@ -21,7 +22,7 @@ a new NNModel object.
 
 argument::path
 the file path of the torchscript file to load. The path is standardized with
-link::Classes/String:-standardizePath:: internally.
+link::Classes/String#-standardizePath:: internally.
 
 argument::id
 a number that identifies this model on the server. Pass code::-1:: (default) to

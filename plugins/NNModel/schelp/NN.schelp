@@ -4,9 +4,25 @@ related:: Classes/NNModel, Classes/NNModelMethod, Classes/NNUGen
 categories:: UGens>Machine Learning
 
 description::
-Load torchscripts on scsynth. Tested with RAVE (v1 and v2) and msprior. 
+nn_tilde adaptation for SuperCollider: load torchscripts on scsynth for
+real-time neural network processing. Tested with RAVE (v1 and v2) and msprior. 
 Models are loaded asynchronously on the server, and stored in a global
 dictionary so that they can then be accessed by key.
+
+subsection::Pre-trained models
+NN.ar is only an interface to load and use torchscripts, but doesn't include any
+pre-trained model. However, pre-trained RAVE models for real-time neural
+synthesis can be found on the Internet, for example:
+list::
+##at acids-ircam, the creators of RAVE:
+link::https://acids-ircam.github.io/rave_models_download::
+##at iil (Intelligent Instruments Lab):
+link::https://huggingface.co/Intelligent-Instruments-Lab/rave-models::
+::
+For training your own RAVE models, please refer to RAVE documentation at
+link::https://github.com/acids-ircam/rave::. NN.ar is not limited to RAVE model,
+and can load and use any model prepared to work in nn_tilde. For more
+information please visit link::https://github.com/acids-ircam/nn_tilde::
 
 subsection::Loading models
 Models are loaded with a key to identify them and a path to a torchscript file:
@@ -127,6 +143,7 @@ code::
 Warmup passes are done on an empty input buffer: the model processes "silent"
 inputs and discards their outputs before starting to process actual
 inputs.
+
 
 classmethods::
 
@@ -266,6 +283,7 @@ s.reboot.waitForBoot {
 )
 
 (
+// latent modulation
 {
 	// drive with a sine wave sound
 	var in = SinOsc.ar(MouseX.kr.exprange(20,20000));
@@ -279,6 +297,7 @@ s.reboot.waitForBoot {
 )
 
 (
+// msprior-generated latents
 {
 	var in = WhiteNoise.ar();
 	// encode input sound to latent space

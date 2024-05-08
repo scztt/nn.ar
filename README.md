@@ -2,7 +2,7 @@
 
 [nn_tilde](https://github.com/acids-ircam/nn_tilde) adaptation for SuperCollider: load torchscripts for real-time audio processing.
 
-### Description
+## Features
 It has most features of nn_tilde:
 - interface for any available model method (e.g. forward, encode, decode)
 - interface for setting model attributes (and a debug interface to print their values when setting them)
@@ -12,40 +12,100 @@ It has most features of nn_tilde:
 - tested so far only with [RAVE](https://github.com/acids-ircam/rave) (v1 and v2) and [msprior](https://github.com/caillonantoine/msprior) models
 - tested so far only on CPU, on linux, windows and mac.
 
+## Installation
+### Download a pre-built release
+
+- Download the latest release for your OS on the [Releases page](https://github.com/elgiano/nn.ar/releases).
+- Extract the archive and copy the `nn.ar` folder to your SuperCollider Extensions folder
+
+**Note for mac users**: binaries are not signed, so you need to run the following in SuperCollider to bypass macos security complaints:
+```supercollider
+runInTerminal("xattr -d -r com.apple.quarantine" + shellQuote(Platform.userExtensionDir +/+ "nn.ar"))
+```
+Failing to do so can produce errors like:
+```
+"libc10.dylib" is damaged and can’t be opened. You should move it to the Bin.
+```
+
+**Note for windows users**: you need to copy some DLLs to the folder where you have `scsynth.exe`.
+1. Inside nn.ar folder you downloaded, there is a folder called `ignore`. Copy all the files inside this folder.
+2. Find the folder where you have `scsynth.exe`, it's usually something like: `C:\Program Files\SuperCollider3.x.x\` (where 3.x.x is the version you have installed).
+3. Paste all the .dll files you got in step 1 to the folder where `scsynth.exe` is.
+
+## Usage
+
+### Pre-trained models
+NN.ar is just an interface to load and play with pre-trained models, but doesn't include any. To begin with, you can find some published pre-trained RAVE models for real-time neural synthesis:
+- from ACIDS-IRCAM: at <https://acids-ircam.github.io/rave_models_download>
+- from iil (Intelligent Instruments Lab): at <https://huggingface.co/Intelligent-Instruments-Lab/rave-models>
+For more information about RAVE, including instructions to train your own models, please visit [acids-ircam/rave](https://github.com/acids-ircam/rave)
+
+### Loading a model
+The following examples assumes you have a pre-trained model saved at `"~/Documents/Percussion.ts"`:
 ```supercollider
 // Example:
 // 1. load
 s.waitForBoot {
     // when in a Routine, this method waits until the model has loaded
-    NN.load(\rave, "~/rave/ravemodel.ts");
+    NN.load(\ravePerc, "~/Documents/Percussion.ts");
     // when model has loaded, print a description of all methods and attributes
-    NN(\rave).describe;
+    NN(\ravePerc).describe;
 }
+```
 
-NN(\rave).methods;
+### Selecting a method
+Available methods are depending on the specific model you're using. RAVE models typically have three methods:
+- forward: for audio-to-audio resynthesis
+- encode: to encode live audio to latent values
+- decode: to decode latent values to audio
+
+```supercollider
+// list all available methods of a pre-trained model
+NN(\ravePerc).methods;
 // -> NNModelMethod(forward: 1 ins, 1 outs), NNModelMethod(encode: 1 ins, 8 outs), ...
 
+// 1. resynthesis using \forward method
+{ NN(\ravePerc, \forward).ar(WhiteNoise.ar) }.play;
 
-// 2. play
-{ NN(\rave, \forward).ar(WhiteNoise.ar, 1024) }.play;
-
-NN.load(\msprior, "~/rave/msprior.ts", action: _.describe);
-
+// 2. latent modulation using \encode and \decode
 {
-    var in, latent, modLatent, prior, resynth;
-
-    in = SoundIn.ar();
-    latent = NN(\rave, \encode).ar(in, 1024);
+    var in, latent, modLatent, prior;
+    // encode sound input to RAVE latent space
+    latent = NN(\ravePerc, \encode).ar(SoundIn.ar);
+    // add a random modulation to every dimension
     modLatent = latent.collect { |l|
         l + LFNoise1.ar(MouseY.kr.exprange(0.1, 30)).range(-0.5, 0.5)
     };
-    prior = NN(\msprior, \forward).ar(latent, 1024);
-    resynth = NN(\rave, \decode).ar(prior.drop(-1), 2048);
-
-    resynth
+    // resynthesize modulated latents
+    NN(\ravePerc, \decode).ar(modLatent);
 }.play;
 
-// 3. attributes:
+// 3. manual latent navigation using only \decode
+// here we assume ravePerc has 8 latent dimensions
+Ndef(\rave) { NN(\ravePerc, \decode).ar(\latents.kr(0!8)) }.play;
+// set all latents
+Ndef(\rave).set(\latents, [0.75, 0.1, 1.5, 0.2, 0.3, 0.7, 1.2, 0.33])
+// set any latent programmatically
+Ndef(\rave).set(\latents, 2, 0.5);
+// simple GUI with sliders:
+(
+var win = View(bounds:800@200);
+var sliders = 8.collect {|i| 
+	Slider().background_(Color.rand)
+	.action_{ |sl| Ndef(\rave).seti(\latents, i, sl.value) }
+};
+win.layout_(HLayout(*sliders)).front
+)
+// using the NodeProxyGui2 Quark, you automatically get the sliders you need:
+// find it at https://github.com/madskjeldgaard/nodeproxygui2
+Ndef(\rave).gui2
+```
+
+### Using attributes
+Some models have custom attributes, to further condition their behavior. Which attribute and which behavior depends on the specific model. NN.ar supports setting and getting attribute values per-UGen, using the `attribute` argument:
+
+```supercollider
+// list model supported attributes
 NN(\msprior).attributes;
 // -> [ listen, temperature, learn_context, reset ]
 
@@ -66,35 +126,28 @@ NN(\msprior).attributes;
         ],
         debug: 1 // print attribute values when setting them
     );
-    resynth = NN(\rave, \decode).ar(prior.drop(-1), 2048);
-
-    resynth
+    NN(\rave, \decode).ar(prior.drop(-1), 2048);
 }.play;
-
 ```
 
-### Installation
+### Buffer configuration
+Like nn_tilde, nn.ar uses an internal circular buffer and runs neural network processing in a separate thread. The second argument of `NN(...).ar` controls this buffer's size, with 0 resulting in no buffering and no separate thread:
 
-#### Download a pre-built release
-
-- Download the latest release for your OS on the [Releases page](https://github.com/elgiano/nn.ar/releases).
-- Extract the archive and copy the `nn.ar` folder to your SuperCollider Extensions folder
-
-**Note for mac users**: binaries are not signed, so you need to run the following in SuperCollider to bypass macos security complaints:
 ```supercollider
-runInTerminal("xattr -d -r com.apple.quarantine" + shellQuote(Platform.userExtensionDir +/+ "nn.ar"))
-```
-Failing to do so can produce errors like:
-```
-"libc10.dylib" is damaged and can’t be opened. You should move it to the Bin.
+// large buffer
+{ NN(\ravePerc, \forward).ar(WhiteNoise.ar, 8192) }.play;
+// no buffer
+{ NN(\ravePerc, \forward).ar(WhiteNoise.ar, 0) }.play;
 ```
 
-**Note for windows users**: you need to copy some DLLs to the folder where you have `scsynth.exe`.
-1. Inside nn.ar folder you downloaded, there is a folder called `ignore`. Copy all the files inside this folder.
-2. Find the folder where you have `scsynth.exe`, it's usually something like: `C:\Program Files\SuperCollider3.x.x\` (where 3.x.x is the version you have installed).
-3. Paste all the .dll files you got in step 1 to the folder where `scsynth.exe` is.
+### Multichannel
+Not implemented yet, use multichannel expansion for now:
+```supercollider
+// resynthesizes three sine waves, each with a separate copy of the model
+{ NN(\ravePerc, \forward).ar(SinOsc.ar([100,200,300])) }
+```
 
-#### Building from source
+## Building from source
 If you compile SuperCollider from source, or if you want to enable optimizations specific to your machine, you need to build this extension yourself.
 
 Build requirements:
@@ -144,7 +197,7 @@ Finally, use CMake to build the project:
 
 The usual `regenerate` command was disabled because `CmakeLists.txt` needed to be manually edited to include libtorch.
 
-#### Design
+## Design
 
 **Buffering and external threads**
 Most nn operation, from loading to processing, are resource intensive and can block the DSP chain. In order to alleviate this, but costing extra latency, we adopted the same buffering method as nn_tilde. When buffering is enabled (by default if not on an NRT server), model loading, processing and parameter setting are done asynchronously on an external thread.
@@ -162,7 +215,7 @@ For processing purposes, models are loaded by NNUGen. This is because each proce
 Since each UGen has its own independent instance of a model, attribute setting is only supported at the UGen level. Currently, attributes are updated each time their value changes, and we suggest to use systems like `Latch` to limit the setting rate (see example above).
 
 
-#### Latency considerations (RAVE)
+### Latency considerations (RAVE)
 
 RAVE models can exhibit an important latency, from various sources. Here is what I found:
 
