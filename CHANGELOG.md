@@ -2,6 +2,7 @@
 
 ### v0.0.4-alpha
 - NNUGen: allow for a custom number of warmup passes (on my setup with rave v2 models, 2 warmup passes work well to avoid initial stuttering)
+- NN: removed automatic model reload on server reboot, in favor of a .reload method
 
 ### v0.0.3-alpha
 changed implementation to independent per-UGen model instance
