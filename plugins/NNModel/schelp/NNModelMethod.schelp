@@ -13,7 +13,7 @@ method::ar
 Returns a link::Classes/NNUGen:: for this model method.
 argument::inputs
 The array of inputs to the process. It must be the correct size
-(link::NNModelMethod#-numInputs::), otherwise an Error is thrown. If the model
+(link::#-numInputs::), otherwise an Error is thrown. If the model
 requires only one input, it can be provided outside an array.
 argument::blockSize
 the number of samples processed at once by the model. Larger values can make for
@@ -40,7 +40,7 @@ argument::attributes
 An array of pairs (attributeName, attributeValue). Attributes will be set
 everytime their attributeValue changes.
 
-returns:: an Array of link::Classes/OutputProxy:: of size link::NNModelMethod#-numOutputs::.
+returns:: an Array of link::Classes/OutputProxy:: of size link::#-numOutputs::.
 
 method::name
 human-readable name
