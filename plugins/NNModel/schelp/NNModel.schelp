@@ -37,19 +37,9 @@ argument::action
 function called after the model and its info are loaded. The callback function
 is given the model as argument.
 
-method::new, get
-Returns a previously loaded NNModel. These methods can't be used to create new
-objects, use link::#*load:: instead.
-argument::key
-
-returns:: a previously loaded NNModel.
-
-method::loadMsg
-returns the OSC message used by link::#*load::
-argument:: key
-argument:: path
-argument:: infoFile
-the path to a temporary file where the server is going to write model info.
+method::new
+NNModel can't be created directly, use link::#*load:: instead.
+returns:: nil
 
 instancemethods::
 
@@ -77,13 +67,37 @@ code::
 NN.models.do { |model| model.reload }
 ::
 
+method::loadMsg
+returns the OSC message used by link::#*load::
+argument:: newPath
+optional, defaults to link::#-path::
+argument:: infoFile
+the path to a temporary file where the server is going to write model info.
+returns:: an OSC message, as an Array
+
 method::idx
 Numeric index used on the server to identify this model.
 
 method::path
 Path of the torchscript file loaded by this model.
 
+method::attrIdx
+argument::attrName
+returns:: the numerical index of attribute teletype::attrName::.
+
 method::key
+Key used by link::Classes/NN:: to store this model.
+
+method::dumpInfo
+argument::outFile
+Sends a message to the server to print all details about this model. Server
+prints to console if outFile is teletype::nil:: (default).
+
+method::dumpInfoMsg
+argument::outFile
+Same as link::#-dumpInfo:: but returns the message instead of sending it to the
+server.
+returns:: an OSC message, as an Array
 
 examples::
 
