@@ -37,7 +37,7 @@ UGens for processing.
 subsection::Real-time processing
 You can get UGens for each models' method like this:
 code::
-	NN(\modelName, \methodName).ar(inputs, blockSize, debug, attributes)
+NN(\modelName, \methodName).ar(inputs, blockSize, debug, attributes)
 ::
 Each NN().ar UGen is specific to a loaded model and method. This is because
 different models and methods require different numbers of inputs and outputs.
@@ -48,19 +48,19 @@ setting attributes is supported only at the UGen level.
 subsection::Attributes
 Torchscript can support settable attributes:
 code::
-	NN(\modelName, \methodName).ar(inputs, attributes: [
-		attributeName: LFNoise0.kr(1),
-		anotherAttr: LFTri.kr(1).range(0, 10)
-	])
+NN(\modelName, \methodName).ar(inputs, attributes: [
+	attributeName: LFNoise0.kr(1),
+	anotherAttr: LFTri.kr(1).range(0, 10)
+])
 ::
 NNUGen accepts a list of pairs (attributeName, attributeValue), and will set
 each attribute when its value changes. It might be useful to limit the rate at
 which an attribute is set by using Latch:
 code::
-	NN(\modelName, \methodName).ar(inputs, attributes: [
-		temperature: Latch.kr(LFTri.kr(1).range(0, 10)),
-		reset: MouseButton.kr(lag:0),
-	], debug: 1)
+NN(\modelName, \methodName).ar(inputs, attributes: [
+	temperature: Latch.kr(LFTri.kr(1).range(0, 10)),
+	reset: MouseButton.kr(lag:0),
+], debug: 1)
 ::
 With code::debug: 1::, NNUGen will print the attribute value every time it's
 set. The printed value is read from the model for every print.
@@ -134,11 +134,11 @@ optimizations during the first passes. NN offers a way of performing a custom
 number of processing passes silently:
 
 code::
-	{ NN(\model, \forward).ar(WhiteNoise.ar) }.play
-	// long dropouts at first, then fine
+{ NN(\model, \forward).ar(WhiteNoise.ar) }.play
+// long dropouts at first, then fine
 
-	{ NN(\model, \forward).ar(WhiteNoise.ar, warmup: 2) }.play
-	// longer silence, but no initial stuttering
+{ NN(\model, \forward).ar(WhiteNoise.ar, warmup: 2) }.play
+// longer silence, but no initial stuttering
 ::
 Warmup passes are done on an empty input buffer: the model processes "silent"
 inputs and discards their outputs before starting to process actual
@@ -180,15 +180,15 @@ otherwise a link::Classes/NNModelMethod::. If the requested model or method is
 not found, an error is thrown.
 
 code::
-	NN(\mymodel);
-	// -> NNModel(mymodel ...)
-	NN(\mymodel, \forward);
-	// -> NNModelMethod(forward ...)
+NN(\mymodel);
+// -> NNModel(mymodel ...)
+NN(\mymodel, \forward);
+// -> NNModelMethod(forward ...)
 
-	NN(\blah);
-	// sERROR: NNModel: model 'blah' not found
-	NN(\mymodel, \blah);
-	// ERROR: NNModel(mymodel): method blah not found
+NN(\blah);
+// sERROR: NNModel: model 'blah' not found
+NN(\mymodel, \blah);
+// ERROR: NNModel(mymodel): method blah not found
 ::
 
 method:: nrt
