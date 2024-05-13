@@ -1,6 +1,8 @@
 #include "NNModel.hpp"
 #include "backend/backend.h"
+#include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <ostream>
 #include "SC_InterfaceTable.h"
@@ -125,15 +127,30 @@ void NNModelDescLib::printAllInfo() const{
   std::cout << std::endl;
 }
 
+unsigned short NNModelDescLib::findId(const char* path) {
+  auto it = std::find_if(std::begin(models), std::end(models), [&path](auto &p) {
+    return strcmp(p.second->getPath(), path) == 0;
+  });
+  // if not found return 65535 (instead of -1 because unsigned short)
+  return (it == std::end(models)) ? 65535 : it->first;
+}
+
+// load:
+// check if model info are already loaded when loading without providing id
+// when id is provided, don't check and load again to another id
+// because the user must know what they're doing:
+// if user loads a model to a specific id, that model should
+// be available at that id, no matter if it's also present somewhere else
 NNModelDesc* NNModelDescLib::load(const char* path) {
-  unsigned short id = getNextId();
+  auto existingId = findId(path);
+  unsigned short id = existingId < 65535 ? existingId : getNextId();
   return load(id, path);
 }
 NNModelDesc* NNModelDescLib::load(unsigned short id, const char* path) {
   auto model = get(id, false);
   /* Print("NNBackend: loading model %s at idx %d\n", path, id); */
   if (model != nullptr) {
-    if (model->getPath() == path) {
+    if (strcmp(model->getPath(), path) == 0) {
       Print("NNBackend: model %d already loaded %s\n", id, path);
       return model;
     } else {

@@ -47,20 +47,18 @@ NN {
 		if (path.isKindOf(String).not) {
 			Error("NN.load: path needs to be a string, got: %".format(path)).throw
 		};
-		if (model.isNil) {
-			if (this.isNRT) {
-				var info =  this.prGetCachedInfo(path) ?? {
-					Error("NN.load (nrt): model info not found for %".format(path)).throw;
-				};
-				model = NNModel.fromInfo(info, this.nextModelID);
-				this.prPutModel(key, model);
-			} {
-				model = NNModel.load(path, id, server, action: { |m|
-				this.prPutModel(key, m);
-					// call action after adding to registry: in case action needs key
-					action.value(m);
-				});
+		if (this.isNRT) {
+			var info =  this.prGetCachedInfo(path) ?? {
+				Error("NN.load (nrt): model info not found for %".format(path)).throw;
 			};
+			model = NNModel.fromInfo(info, this.nextModelID);
+			this.prPutModel(key, model);
+		} {
+			model = NNModel.load(path, id, server, action: { |m|
+			this.prPutModel(key, m);
+				// call action after adding to registry: in case action needs key
+				action.value(m);
+			});
 		};
 		if (this.isNRT) {
 			server.sendMsg(*model.loadMsg);

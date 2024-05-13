@@ -67,6 +67,7 @@ public:
 
   // get stored model
   NNModelDesc* get(unsigned short id, bool warn=true) const;
+  unsigned short findId(const char* path);
   // all loaded models info
   void streamAllInfo(std::ostream& stream) const;
   bool dumpAllInfo(const char* filename) const;
