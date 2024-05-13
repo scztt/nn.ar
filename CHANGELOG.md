@@ -1,5 +1,9 @@
 # CHANGELOG
 
+### v0.0.5-alpha
+- Multichannel batch processing: multiple inputs will be processed *by the same model* as parallel batches
+- only scsynth checks if a model is already loaded before (re-)loading it
+
 ### v0.0.4-alpha
 - NNUGen: allow for a custom number of warmup passes (on my setup with rave v2 models, 2 warmup passes work well to avoid initial stuttering)
 - NN: removed automatic model reload on server reboot, in favor of a .reload method
