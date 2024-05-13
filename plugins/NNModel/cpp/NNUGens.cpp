@@ -13,6 +13,12 @@ InterfaceTable* ft;
 // global model store, by numeric id
 NN::NNModelDescLib gModels;
 
+/* #define DEBUG */
+#ifdef DEBUG
+#define Debug(...) Print(__VA_ARGS__)
+#else
+#define Debug(...)
+#endif
 
 template<class T>
 T* rtAlloc(World* world, size_t size=1) {
@@ -48,7 +54,7 @@ void NNSetAttr::update(Unit* unit, int nSamples) {
 
 // attributes are provided as additional input pairs (attrId, val) after model inputs
 void NNUGen::setupAttributes() {
-  int i = UGenInputs::inputs + m_inDim;
+  int i = UGenInputs::inputs + m_inDim * m_batches;
   while (i < numInputs()) {
     int attrIdx = in0(i);
     auto attr = m_sharedData->m_modelDesc->getAttribute(attrIdx, true);
@@ -111,15 +117,15 @@ void model_perform_cleanup(NN* nn_instance) {
 void model_perform(NN* nn_instance) {
   /* Timer timer; */
   std::vector<float *> in_model, out_model;
-  for (int c(0); c < nn_instance->m_inDim; ++c)
+  for (int c(0); c < nn_instance->m_inDim * nn_instance->m_batches; ++c)
     in_model.push_back(&nn_instance->m_inModel[nn_instance->m_bufferSize * c]);
-  for (int c(0); c < nn_instance->m_outDim; ++c)
+  for (int c(0); c < nn_instance->m_outDim * nn_instance->m_batches; ++c)
     out_model.push_back(&nn_instance->m_outModel[nn_instance->m_bufferSize * c]);
   model_perform_attributes(nn_instance);
   /* timer.print("attrs:"); */
   nn_instance->m_model.perform(in_model, out_model,
                                nn_instance->m_bufferSize,
-                               nn_instance->m_method->name, 1);
+                               nn_instance->m_method->name, nn_instance->m_batches);
   /* timer.print("perform:"); */
 }
 
@@ -127,25 +133,27 @@ void model_perform(NN* nn_instance) {
 void model_perform_loop(NN *nn_instance, int warmup) {
   model_perform_load(nn_instance, warmup);
   std::vector<float *> in_model, out_model;
-  for (int c(0); c < nn_instance->m_inDim; ++c)
+  int numInputs = nn_instance->m_inDim * nn_instance->m_batches;
+  int numOutputs = nn_instance->m_outDim * nn_instance->m_batches;
+  for (int c(0); c < numInputs; ++c)
     in_model.push_back(&nn_instance->m_inModel[nn_instance->m_bufferSize * c]);
-  for (int c(0); c < nn_instance->m_outDim; ++c)
+  for (int c(0); c < numOutputs; ++c)
     out_model.push_back(&nn_instance->m_outModel[nn_instance->m_bufferSize * c]);
   while (!nn_instance->m_should_stop_perform_thread) {
     if (nn_instance->m_data_available_lock.try_acquire_for(
       std::chrono::milliseconds(200))) {
         /* nn_instance->timer.print("received in:"); */
-        model_perform_attributes(nn_instance);
+      model_perform_attributes(nn_instance);
         /* Timer timer; */
-        nn_instance->m_model.perform(in_model, out_model,
-                                     nn_instance->m_bufferSize,
-                                     nn_instance->m_method->name, 1);
+      nn_instance->m_model.perform(in_model, out_model,
+                                   nn_instance->m_bufferSize,
+                                   nn_instance->m_method->name, nn_instance->m_batches);
         /* timer.print("model perform:"); */
       nn_instance->m_result_available_lock.release();
     }
   }
   model_perform_cleanup(nn_instance);
-  /* Print("thread exit\n"); */
+  Debug("NN: thread exit\n");
 }
 
 void NNUGen::next(int nSamples) {
@@ -158,8 +166,11 @@ void NNUGen::next(int nSamples) {
   // update attr setters
   for (auto& a: m_sharedData->m_attributes) a.update(this, nSamples);
 
+  int numInputs = m_inDim * m_batches;
+  int numOutputs = m_outDim * m_batches;
+
   // copy inputs to circular buffer
-  for (int c(0); c < m_inDim; ++c) {
+  for (int c(0); c < numInputs; ++c) {
     m_inBuffer[c].put(in(UGenInputs::inputs + c), bufferSize());
   }
 
@@ -167,20 +178,20 @@ void NNUGen::next(int nSamples) {
 
     if (!m_useThread) {
 
-      for (int c(0); c < m_inDim; ++c)
+      for (int c(0); c < numInputs; ++c)
         m_inBuffer[c].get(&m_inModel[c * m_bufferSize], m_bufferSize);
 
       model_perform(m_sharedData);
 
-      for (int c(0); c < m_outDim; ++c)
+      for (int c(0); c < numOutputs; ++c)
         m_outBuffer[c].put(&m_outModel[c * m_bufferSize], m_bufferSize);
     } else if (m_sharedData->m_result_available_lock.try_acquire()) {
       /* Print("sending\n"); m_sharedData->timer.reset(); */
       // TRANSFER MEMORY BETWEEN INPUT CIRCULAR BUFFER AND MODEL BUFFER
-      for (int c(0); c < m_inDim; ++c)
+      for (int c(0); c < numInputs; ++c)
         m_inBuffer[c].get(&m_inModel[c * m_bufferSize], m_bufferSize);
       // TRANSFER MEMORY BETWEEN OUTPUT CIRCULAR BUFFER AND MODEL BUFFER
-      for (int c(0); c < m_outDim; ++c)
+      for (int c(0); c < numOutputs; ++c)
         m_outBuffer[c].put(&m_outModel[c * m_bufferSize], m_bufferSize);
       // SIGNAL PERFORM THREAD THAT DATA IS AVAILABLE
       m_sharedData->m_data_available_lock.release();
@@ -188,7 +199,7 @@ void NNUGen::next(int nSamples) {
   }
 
   // copy circular buf to out
-  for (int c(0); c < m_sharedData->m_outDim; ++c)
+  for (int c(0); c < numOutputs; ++c)
     m_outBuffer[c].get(out(c), bufferSize());
 }
 
@@ -197,12 +208,13 @@ NN::NN(
   const NNModelDesc* modelDesc, const NNModelMethod* modelMethod,
   float* inModel, float* outModel,  
   RingBuf* inRing, RingBuf* outRing,
-  int bufferSize, int debug): 
+  int bufferSize, int debug, int batches): 
   mWorld(world),
   m_inModel(inModel), m_outModel(outModel),
   m_inBuffer(inRing), m_outBuffer(outRing),
   m_method(modelMethod), m_modelDesc(modelDesc), 
   m_bufferSize(bufferSize), m_debug(debug),
+  m_batches(batches),
   m_compute_thread(nullptr),
   m_data_available_lock(0), m_result_available_lock(1),
   m_should_stop_perform_thread(false), m_loaded(false)
@@ -226,8 +238,10 @@ NNUGen::NNUGen():
   }
   m_inDim = modelMethod->inDim;
   m_outDim = modelMethod->outDim;
+  m_batches = sc_max(1, static_cast<int>(in0(UGenInputs::n_batches)));
 
   m_bufferSize = in0(UGenInputs::bufSize);
+  Debug("NNUGen: bufSize %d\n", m_bufferSize); 
 
   // don't use external thread on NRT
   m_useThread = mWorld->mRealTime;
@@ -268,31 +282,35 @@ NNUGen::NNUGen():
     freeBuffers();
     ClearUnitOnMemFailed;
   }
+  Debug("NNUGen: init sharedData\n");
   m_sharedData = new(data) NN(mWorld, modelDesc, modelMethod, 
                         m_inModel, m_outModel, m_inBuffer, m_outBuffer,
-                        m_bufferSize, m_debug);
+                        m_bufferSize, m_debug, m_batches);
 
+  Debug("NNUGen: use thread %d\n", m_useThread);
   int warmup = static_cast<int>(in0(UGenInputs::warmup));
   if (m_useThread)
     m_sharedData->m_compute_thread = new std::thread(model_perform_loop, m_sharedData, warmup);
   else
     model_perform_load(m_sharedData, warmup);
 
+  Debug("NNUGen: setupAttributes\n", m_useThread);
   setupAttributes();
 
   mCalcFunc = make_calc_function<NNUGen, &NNUGen::next>();
-  /* Print("NN: Ctor done\n"); */
+  if (m_debug >= Debug::all)
+  Debug("NNUGen: Ctor done\n");
 }
 
 NNUGen::~NNUGen() {
-  /* Print("NN: Dtor\n"); */
+  Debug("NN: Dtor\n");
   if (m_sharedData->m_compute_thread) {
     // don't wait for join, it would stall the dsp chain
     // thread frees resources when stopped
     m_sharedData->m_should_stop_perform_thread = true;
     /* m_compute_thread->join(); */
   } else {
-    /* Print("freeing manually\n"); */
+    Debug("NN: freeing manually\n");
     m_sharedData->~NN(); // this frees resources
     RTFree(mWorld, m_sharedData);
   }
@@ -322,16 +340,18 @@ void freeRingBuffer(World* world, RingBuf* buf) {
 }
 
 bool NNUGen::allocBuffers() {
-  m_inBuffer = allocRingBuffer(mWorld, m_bufferSize, m_inDim);
+  int numInputs = m_inDim * m_batches;
+  int numOutputs = m_outDim * m_batches;
+  m_inBuffer = allocRingBuffer(mWorld, m_bufferSize, numInputs);
   if (m_inBuffer == nullptr) return false;
-  m_outBuffer = allocRingBuffer(mWorld, m_bufferSize, m_outDim);
+  m_outBuffer = allocRingBuffer(mWorld, m_bufferSize, numOutputs);
   if (m_outBuffer == nullptr) return false;
-  m_inModel = rtAlloc<float>(mWorld, m_bufferSize * m_inDim);
-  if (m_inModel == nullptr) return false;
-  m_outModel = rtAlloc<float>(mWorld, m_bufferSize * m_outDim);
-  if (m_outModel == nullptr) return false;
-  memset(m_inModel, 0, sizeof(float) * m_bufferSize * m_inDim);
-  memset(m_outModel, 0, sizeof(float) * m_bufferSize * m_outDim);
+  m_inModel = rtAlloc<float>(mWorld, m_bufferSize * numInputs);
+  if(m_inModel == nullptr) return false;
+  m_outModel = rtAlloc<float>(mWorld, m_bufferSize * numOutputs);
+  if(m_outModel == nullptr) return false;
+  memset(m_inModel, 0, sizeof(float) * m_bufferSize * numInputs);
+  memset(m_outModel, 0, sizeof(float) * m_bufferSize * numOutputs);
   /* Print("m_inModel: %p\nm_outModel: %p\n", m_inModel, m_outModel); */
   return true;
 }
