@@ -1,6 +1,9 @@
 // NNModel.hpp
 
 #pragma once
+
+#include "backend/backend.h"
+
 #include <map>
 #include <ostream>
 #include <vector>
@@ -51,8 +54,10 @@ public:
     void printInfo() const;
     int getHigherRatio() const { return m_higherRatio; }
     char const* getPath() const { return m_path.c_str(); }
+    Backend const& backend() const { return m_backend; }
 
 private:
+    Backend m_backend;
     std::vector<NNModelMethod> m_methods;
     std::vector<NNModelAttribute> m_attributes;
     int m_higherRatio;

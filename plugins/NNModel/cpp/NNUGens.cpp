@@ -118,12 +118,7 @@ void model_perform_load(NN* nn, int warmup)
     auto path = nn->m_modelDesc->getPath();
     if (nn->m_debug >= Debug::all)
         Print("NNUGen: loading model %s\n", path);
-    int err = nn->m_model.load(path);
-    if (err)
-    {
-        Print("NNUGen: ERROR loading model %s\n", path);
-        return;
-    }
+    nn->bindModel();
     if (warmup > 0)
     {
         if (nn->m_debug >= Debug::all)
@@ -274,6 +269,7 @@ NN::NN(
 , m_result_available_lock(1)
 , m_should_stop_perform_thread(false)
 , m_loaded(false)
+, m_model()
 {
     m_inDim = m_method->inDim;
     m_outDim = m_method->outDim;
@@ -471,6 +467,11 @@ NN::~NN()
     {
         free(m_compute_thread);
     }
+}
+
+void NN::bindModel()
+{
+    m_model = m_modelDesc->backend();
 }
 
 void NN::warmupModel(int n_passes = 1)

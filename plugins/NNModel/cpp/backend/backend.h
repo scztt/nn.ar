@@ -20,6 +20,9 @@ protected:
 
 public:
     Backend();
+
+    Backend& operator=(Backend const&);
+
     void perform(
         std::vector<float*> in_buffer,
         std::vector<float*> out_buffer,

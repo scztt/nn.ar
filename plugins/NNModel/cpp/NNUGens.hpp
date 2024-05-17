@@ -87,6 +87,7 @@ public:
 
     ~NN();
 
+    void bindModel();
     void warmupModel(int n_passes);
 
     RingBuf* m_inBuffer;

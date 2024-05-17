@@ -1,5 +1,7 @@
 #include "backend.h"
+#include "../TrackTime.hpp"
 #include "parsing_utils.h"
+
 #include <algorithm>
 #include <iostream>
 #include <stdlib.h>
@@ -14,6 +16,20 @@ Backend::Backend()
 , m_use_gpu(false)
 {
     at::init_num_threads();
+}
+
+Backend& Backend::operator=(Backend const& other)
+{
+    // assert(!m_loaded);
+
+    m_model = trackTime("m_model.deepcopy()", [&] { return other.m_model.deepcopy(); });
+    m_loaded = other.m_loaded;
+    m_path = other.m_path;
+    m_available_methods = other.m_available_methods;
+    m_device = other.m_device;
+    m_use_gpu = other.m_use_gpu;
+
+    return *this;
 }
 
 void Backend::perform(
