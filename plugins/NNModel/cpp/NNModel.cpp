@@ -23,8 +23,8 @@ NNModelDesc::NNModelDesc(unsigned short id)
 bool NNModelDesc::load(char const* path)
 {
     Print("NNModelDesc: loading %s\n", path);
-    Backend backend;
-    bool loaded = backend.load(path) == 0;
+
+    bool loaded = m_backend.load(path) == 0;
     if (loaded)
     {
         Print("NNModelDesc: loaded %s\n", path);
@@ -38,14 +38,14 @@ bool NNModelDesc::load(char const* path)
     // cache path
     m_path = path;
 
-    m_higherRatio = backend.get_higher_ratio();
+    m_higherRatio = m_backend.get_higher_ratio();
 
     // cache methods
     if (m_methods.size() > 0)
         m_methods.clear();
-    for (std::string const& name : backend.get_available_methods())
+    for (std::string const& name : m_backend.get_available_methods())
     {
-        auto params = backend.get_method_params(name);
+        auto params = m_backend.get_method_params(name);
         // skip methods with no params
         if (params.size() == 0)
             continue;
@@ -55,11 +55,11 @@ bool NNModelDesc::load(char const* path)
     // cache attributes
     if (m_attributes.size() > 0)
         m_attributes.clear();
-    for (std::string const& name : backend.get_settable_attributes())
+    for (std::string const& name : m_backend.get_settable_attributes())
     {
         try
         {
-            c10::IValue value = backend.get_attribute(name)[0];
+            c10::IValue value = m_backend.get_attribute(name)[0];
             NNAttributeType attrType;
             if (value.isBool())
                 attrType = NNAttributeType::typeBool;
